@@ -123,6 +123,8 @@ button { cursor: pointer; }
 }
 .btn:hover { border-color: var(--muted); }
 .btn-sm { padding: 5px 10px; font-size: 13px; }
+.install-btn { height: 36px; background: var(--accent); border-color: var(--accent); color: #fff; }
+.install-btn:hover { border-color: var(--ink); }
 .btn-ghost { background: transparent; }
 
 .seg {

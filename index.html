@@ -7,12 +7,12 @@
   <meta name="description" content="Napi deviza-, arany- és kriptoárfolyamok RON-ban és USD-ben, grafikonnal és átváltóval.">
   <meta name="theme-color" content="#f3efe6">
   <link rel="icon" href="logo.webp" type="image/webp">
-  <link rel="apple-touch-icon" href="logo.webp">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Saira:wght@500;600;700&family=Audiowide&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2.0.0">
+  <link rel="stylesheet" href="styles.css?v=2.1.0">
   <script>
     try { const t = localStorage.getItem('ngm-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
   </script>
@@ -25,6 +25,7 @@
         <span class="brand-name">NetguY <em>Market</em></span>
       </a>
       <div class="top-actions">
+        <button class="btn btn-sm install-btn" id="installBtn" type="button" hidden>Telepítés</button>
         <button class="status" id="status" type="button" aria-live="polite">
           <span class="dot" aria-hidden="true"></span><span id="statusText">Betöltés…</span>
         </button>
@@ -76,7 +77,7 @@
     </footer>
   </div>
 
-  <script src="data.js?v=2.0.0"></script>
-  <script src="app.js?v=2.0.0"></script>
+  <script src="data.js?v=2.1.0"></script>
+  <script src="app.js?v=2.1.0"></script>
 </body>
 </html>

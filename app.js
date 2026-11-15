@@ -509,6 +509,25 @@
   setInterval(maybeRefresh, 60e3);
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { applyThemeColor(); if (state.route) renderDetail(state.route); });
 
+  /* ---------- Telepítés alkalmazásként ---------- */
+  let installEvt = null;
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    installEvt = e;
+    $('installBtn').hidden = false;
+  });
+  $('installBtn').addEventListener('click', async () => {
+    if (!installEvt) return;
+    installEvt.prompt();
+    await installEvt.userChoice.catch(() => null);
+    installEvt = null;
+    $('installBtn').hidden = true;
+  });
+  window.addEventListener('appinstalled', () => { $('installBtn').hidden = true; });
+  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+
   /* ---------- Indítás ---------- */
   loadCache();
   initConverter();
