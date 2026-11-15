@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="hu">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>NetguY Market – Árfolyamok</title>
+  <meta name="description" content="Napi deviza-, arany- és kriptoárfolyamok RON-ban és USD-ben, grafikonnal és átváltóval.">
+  <meta name="theme-color" content="#f3efe6">
+  <link rel="icon" href="logo.webp" type="image/webp">
+  <link rel="apple-touch-icon" href="logo.webp">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Saira:wght@500;600;700&family=Audiowide&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=2.0.0">
+  <script>
+    try { const t = localStorage.getItem('ngm-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+  </script>
+</head>
+<body>
+  <div class="shell">
+    <header class="top">
+      <a class="brand" href="#" aria-label="NetguY Market – kezdőlap">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-name">NetguY <em>Market</em></span>
+      </a>
+      <div class="top-actions">
+        <button class="status" id="status" type="button" aria-live="polite">
+          <span class="dot" aria-hidden="true"></span><span id="statusText">Betöltés…</span>
+        </button>
+        <button class="icon-btn" id="refreshBtn" type="button" title="Frissítés (R)" aria-label="Frissítés">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="icon-btn" id="themeBtn" type="button" title="Világos / sötét téma" aria-label="Téma váltása">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="err-panel" id="errPanel" hidden></div>
+
+    <main id="app">
+      <section id="home" class="view">
+        <div class="intro">
+          <p class="eyebrow" id="today"></p>
+          <h1>Árfolyamok<span class="accent">.</span></h1>
+          <p class="lede">Deviza, arany és kripto – egy helyen, grafikonnal.</p>
+        </div>
+        <div class="home-grid">
+          <div id="lists"></div>
+          <aside class="card conv" aria-labelledby="convTitle">
+            <h2 id="convTitle">Átváltó</h2>
+            <label class="field">
+              <span>Összeg</span>
+              <input id="cAmt" inputmode="decimal" autocomplete="off" value="100">
+            </label>
+            <div class="conv-pair">
+              <label class="field"><span>Miből</span><select id="cFrom"></select></label>
+              <button class="icon-btn swap" id="cSwap" type="button" title="Csere" aria-label="Pénznemek cseréje">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+              <label class="field"><span>Mibe</span><select id="cTo"></select></label>
+            </div>
+            <output id="cOut" class="conv-out" for="cAmt cFrom cTo">–</output>
+            <p class="conv-rate" id="cRate"></p>
+          </aside>
+        </div>
+      </section>
+
+      <section id="detail" class="view" hidden></section>
+    </main>
+
+    <footer class="foot">
+      <p>Források: BNR (Frankfurter) napi devizaárfolyam · arany: XAUS / Standard Bullion, BNR USD/RON átszámítással · kripto: Coinbase / CryptoCompare.</p>
+      <p>Az adatok tájékoztató jellegűek. Billentyűk: <kbd>R</kbd> frissítés, <kbd>Esc</kbd> vissza.</p>
+    </footer>
+  </div>
+
+  <script src="data.js?v=2.0.0"></script>
+  <script src="app.js?v=2.0.0"></script>
+</body>
+</html>

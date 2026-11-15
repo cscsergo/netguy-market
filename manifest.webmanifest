@@ -1,0 +1,11 @@
+{
+  "name": "NetguY Market",
+  "short_name": "NetguY",
+  "description": "Napi deviza-, arany- és kriptoárfolyamok grafikonnal és átváltóval.",
+  "lang": "hu",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f3efe6",
+  "theme_color": "#f3efe6",
+  "icons": [{ "src": "logo.webp", "sizes": "2000x1887", "type": "image/webp", "purpose": "any" }]
+}
