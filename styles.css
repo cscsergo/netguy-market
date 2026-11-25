@@ -224,6 +224,8 @@ a.row:hover { background: var(--surface); }
 .b-xau { background: linear-gradient(135deg, #e9c46a, #b8862b); color: #3b2a07; font-family: var(--serif); font-size: 21px; font-weight: 400; }
 .b-btc { background: #f2a33a; }
 .b-eth { background: #5a6fd6; }
+.b-cro { background: #103f68; font-size: 12px; letter-spacing: .02em; }
+.badge-lg.b-cro { font-size: 15px; }
 
 .skel {
   display: block; height: 14px; border-radius: 6px;

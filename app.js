@@ -1,4 +1,4 @@
-/* NetguY Market 2.0 – felület. */
+/* NetguY Market 2.2 – felület. */
 (() => {
   'use strict';
   const { loadAll, fxAt, back } = window.MarketData;
@@ -7,7 +7,7 @@
   const GROUPS = [
     { id: 'fx', title: 'Devizák', sub: 'BNR hivatalos árfolyam · RON', syms: ['EUR', 'USD', 'GBP', 'HUF'] },
     { id: 'XAU', title: 'Nemesfém', sub: 'Spot ár · RON', syms: ['XAU'] },
-    { id: 'crypto', title: 'Kripto', sub: 'Piaci ár', syms: ['BTC', 'ETH'] }
+    { id: 'crypto', title: 'Kripto', sub: 'Piaci ár', syms: ['BTC', 'ETH', 'CRO'] }
   ];
   const META = {
     EUR: { name: 'Euró', badge: '€', unit: 1, unitLabel: '1 EUR', dig: 4, group: 'fx', kind: 'fx' },
@@ -16,12 +16,13 @@
     HUF: { name: 'Magyar forint', badge: 'Ft', unit: 100, unitLabel: '100 HUF', dig: 4, group: 'fx', kind: 'fx' },
     XAU: { name: 'Arany', badge: 'Au', unit: 1, unitLabel: '1 gramm · 24K', dig: 2, group: 'XAU', kind: 'gold' },
     BTC: { name: 'Bitcoin', badge: '₿', unit: 1, unitLabel: '1 BTC', dig: 2, group: 'BTC', kind: 'crypto' },
-    ETH: { name: 'Ethereum', badge: 'Ξ', unit: 1, unitLabel: '1 ETH', dig: 2, group: 'ETH', kind: 'crypto' }
+    ETH: { name: 'Ethereum', badge: 'Ξ', unit: 1, unitLabel: '1 ETH', dig: 2, group: 'ETH', kind: 'crypto' },
+    CRO: { name: 'Cronos', badge: 'CRO', unit: 1, unitLabel: '1 CRO · Crypto.com', dig: 5, group: 'CRO', kind: 'crypto' }
   };
   const NOTES = {
     fx: 'Hivatalos BNR referencia-árfolyam. Hétvégén és ünnepnapon nincs új jegyzés.',
     gold: 'Nemzetközi spot ár USD/unciában, a napi BNR USD/RON árfolyammal grammra és lejre átszámítva.',
-    crypto: 'Napi záróár (UTC); a mai érték az aktuális piaci ár.'
+    crypto: 'Napi záróár (UTC); a mai érték az aktuális piaci ár (CoinGecko).'
   };
   const RANGES = [[7, '7N'], [30, '1H'], [90, '3H'], [180, '6H'], [365, '1É']];
   const STORE = 'netguy-market-v2';
@@ -32,7 +33,7 @@
   const prefs = Object.assign({ range: 30, cryptoCur: 'USD', from: 'EUR', to: 'RON', amount: '100' }, readJSON(PREFS));
   const state = {
     assets: {},
-    groups: { fx: idle(), XAU: idle(), BTC: idle(), ETH: idle() },
+    groups: { fx: idle(), XAU: idle(), BTC: idle(), ETH: idle(), CRO: idle() },
     loading: false,
     lastRefresh: 0,
     route: undefined,
@@ -154,7 +155,7 @@
   }
 
   /* ---------- Fejléc állapot ---------- */
-  const GROUP_NAMES = { fx: 'BNR-devizák', XAU: 'Arany', BTC: 'Bitcoin', ETH: 'Ethereum' };
+  const GROUP_NAMES = { fx: 'BNR-devizák', XAU: 'Arany', BTC: 'Bitcoin', ETH: 'Ethereum', CRO: 'Cronos' };
   function renderStatus() {
     const btn = $('status'), txt = $('statusText');
     const errs = Object.entries(state.groups).filter(([, g]) => g.status === 'error');
@@ -206,7 +207,7 @@
         `<span class="spark"></span><span class="skel w1"></span><span class="skel w2"></span></div></li>`;
     }
     const s30 = sliceRange(v.s, 30), ch30 = changeOver(v.s, 30);
-    const dg = m.kind === 'crypto' ? 2 : m.dig;
+    const dg = m.dig;
     const stale = g.status === 'error' ? ' <span class="tag">mentett</span>' : '';
     const liveTag = v.asset.live && v.last.d === MarketData.todayRO() ? '<span class="live" title="Aktuális ár"></span>' : '';
     const unit = m.kind === 'crypto' ? `${m.unitLabel}` : m.unitLabel;
@@ -236,7 +237,7 @@
 
   /* ---------- Átváltó ---------- */
   const CONV = [['RON', 'Román lej'], ['EUR', 'Euró'], ['USD', 'Amerikai dollár'], ['GBP', 'Angol font'], ['HUF', 'Magyar forint'],
-    ['XAU', 'Arany (gramm)'], ['BTC', 'Bitcoin'], ['ETH', 'Ethereum']];
+    ['XAU', 'Arany (gramm)'], ['BTC', 'Bitcoin'], ['ETH', 'Ethereum'], ['CRO', 'Cronos']];
   function initConverter() {
     const opts = CONV.map(([c, n]) => `<option value="${c}">${c} – ${n}</option>`).join('');
     $('cFrom').innerHTML = opts; $('cTo').innerHTML = opts;
@@ -283,7 +284,7 @@
         : `<div class="card empty-card"><div class="loader" aria-label="Betöltés"></div></div>`);
       return;
     }
-    const dg = m.kind === 'crypto' ? 2 : m.dig;
+    const dg = m.dig;
     const range = prefs.range;
     const r = sliceRange(v.s, range);
     const first = r[0], last = r[r.length - 1];
@@ -349,7 +350,7 @@
   function downloadCSV(sym) {
     const v = view(sym); if (!v) return;
     const r = sliceRange(v.s, prefs.range);
-    const dg = META[sym].kind === 'crypto' ? 2 : META[sym].dig;
+    const dg = META[sym].dig;
     const lines = ['Dátum;Árfolyam (' + v.cur + ')'].concat(r.map(p => `${p.d};${p.v.toFixed(dg + 2).replace('.', ',')}`));
     const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
@@ -490,7 +491,7 @@
     if (t.dataset.range) { prefs.range = Number(t.dataset.range); state.tableLimit = 20; savePrefs(); renderDetail(state.route); }
     else if (t.dataset.cur) { prefs.cryptoCur = t.dataset.cur; savePrefs(); render(); }
     else if (t.dataset.act === 'retry') { state.errOpen = false; refresh(); }
-    else if (t.dataset.act === 'more') { state.tableLimit += 30; const v = view(state.route); const dg = META[state.route].kind === 'crypto' ? 2 : META[state.route].dig; renderTable(v, sliceRange(v.s, prefs.range), dg); }
+    else if (t.dataset.act === 'more') { state.tableLimit += 30; const v = view(state.route); const dg = META[state.route].dig; renderTable(v, sliceRange(v.s, prefs.range), dg); }
     else if (t.dataset.act === 'csv') downloadCSV(state.route);
   });
   $('refreshBtn').addEventListener('click', () => refresh());

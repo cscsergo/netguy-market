@@ -1,4 +1,4 @@
-/* NetguY Market 2.0 – adatréteg. Kulcs nélküli, CORS-t támogató nyilvános API-k. */
+/* NetguY Market 2.2 – adatréteg. Kulcs nélküli, CORS-t támogató nyilvános API-k. */
 (function (root) {
   'use strict';
   const DAY = 864e5;
@@ -129,9 +129,29 @@
   }
 
   /* ---------- Kripto (USD) ---------- */
+  const CG = 'https://api.coingecko.com/api/v3';
+  const CG_IDS = { BTC: 'bitcoin', ETH: 'ethereum', CRO: 'crypto-com-chain' };
+  const NO_COINBASE = new Set(['CRO']);
+
+  /* CoinGecko: a napi pont éjfélkor (UTC) érkezik, és az előző nap záróárát jelenti → 1 ms-mal visszacsúsztatjuk. */
+  async function geckoHistory(sym) {
+    const j = await getJSON(`${CG}/coins/${CG_IDS[sym]}/market_chart?vs_currency=usd&days=365&interval=daily`);
+    const p = j && j.prices;
+    if (!Array.isArray(p) || p.length < 2) throw new Error('CoinGecko: üres');
+    const rows = p.filter(x => Array.isArray(x) && x.length >= 2)
+      .map(([t, v]) => ({ d: isoOf(Number(t) - 1), v: Number(v) }));
+    return { rows, source: 'CoinGecko' };
+  }
+
+  /* Egyetlen kérés az összes coin élő árára (kíméli a CoinGecko kérés-korlátját). */
+  function geckoSpotAll() {
+    const p = getJSON(`${CG}/simple/price?ids=${Object.values(CG_IDS).join(',')}&vs_currencies=usd`, 8000);
+    p.catch(() => {});
+    return p;
+  }
+
   function cryptoHistory(sym, today) {
-    return firstOk([
-      async () => {
+    const coinbase = async () => {
         // Coinbase: legfeljebb 300 gyertya / kérés → két részlet.
         const end = Date.parse(today + 'T00:00:00Z') + DAY;
         const start = end - KEEP * DAY;
@@ -144,50 +164,60 @@
           .map(c => ({ d: isoOf(Number(c[0]) * 1000), v: Number(c[4]) }));
         if (rows.length < 2) throw new Error('Coinbase: üres');
         return { rows, source: 'Coinbase' };
-      },
-      async () => {
+    };
+    const compare = async () => {
         const j = await getJSON(`https://min-api.cryptocompare.com/data/v2/histoday?fsym=${sym}&tsym=USD&limit=${KEEP}&extraParams=NetguYMarket`);
         const c = j && j.Data && j.Data.Data;
         if (!Array.isArray(c) || c.length < 2) throw new Error('CryptoCompare: üres');
         return { rows: c.map(k => ({ d: isoOf(k.time * 1000), v: Number(k.close) })), source: 'CryptoCompare' };
-      }
-    ]);
+    };
+    const gecko = () => geckoHistory(sym);
+    return firstOk(NO_COINBASE.has(sym) ? [gecko, compare] : [coinbase, gecko, compare]);
   }
 
-  function cryptoSpot(sym) {
-    return firstOk([
+  function cryptoSpot(sym, geckoSpot) {
+    const tasks = [
+      async () => {
+        const j = await geckoSpot;
+        const p = Number(j && j[CG_IDS[sym]] && j[CG_IDS[sym]].usd);
+        if (!good(p)) throw new Error('CoinGecko: nincs ár');
+        return { p, source: 'CoinGecko' };
+      },
       async () => {
         const j = await getJSON(`https://api.exchange.coinbase.com/products/${sym}-USD/ticker`, 8000);
         const p = Number(j && j.price);
         if (!good(p)) throw new Error('Coinbase: nincs ár');
-        return p;
+        return { p, source: 'Coinbase' };
       },
       async () => {
         const j = await getJSON(`https://min-api.cryptocompare.com/data/price?fsym=${sym}&tsyms=USD&extraParams=NetguYMarket`, 8000);
         const p = Number(j && j.USD);
         if (!good(p)) throw new Error('CryptoCompare: nincs ár');
-        return p;
+        return { p, source: 'CryptoCompare' };
       }
-    ]);
+    ];
+    return firstOk(NO_COINBASE.has(sym) ? [tasks[0], tasks[2]] : tasks);
   }
 
-  async function loadCrypto(sym, today) {
-    const [hist, spot] = await Promise.all([cryptoHistory(sym, today), cryptoSpot(sym).catch(() => null)]);
+  async function loadCrypto(sym, today, geckoSpot) {
+    const [hist, spot] = await Promise.all([cryptoHistory(sym, today), cryptoSpot(sym, geckoSpot).catch(() => null)]);
     const rows = hist.rows.slice();
     let live = false;
-    if (good(spot)) { rows.push({ d: today, v: spot }); live = true; }
+    if (spot && good(spot.p)) { rows.push({ d: today, v: spot.p }); live = true; }
     const series = clean(rows, today);
     if (!series.length) throw new Error('nincs használható adat');
-    return { series, cur: 'USD', source: hist.source + ' · USD', live };
+    const src = live && spot.source !== hist.source ? `${hist.source} (előzmény) · ${spot.source} (élő ár)` : hist.source;
+    return { series, cur: 'USD', source: src + ' · USD', live };
   }
 
   /*
    * Minden forrás párhuzamosan indul; ami megérkezik, azonnal jelentjük (onPart),
-   * így a felület fokozatosan töltődik fel. Csoportok: fx, XAU, BTC, ETH.
+   * így a felület fokozatosan töltődik fel. Csoportok: fx, XAU, BTC, ETH, CRO.
    */
   function loadAll(onPart, opts = {}) {
     const today = todayRO();
     const fxP = loadFX(today);
+    const gSpot = geckoSpotAll();
     const jobs = {
       fx: fxP,
       XAU: fxP.catch(() => null).then(fx => {
@@ -195,8 +225,9 @@
         if (!usd || !usd.length) throw new Error('USD/RON adat nélkül nem számolható');
         return loadGold(today, usd).then(g => ({ XAU: g }));
       }),
-      BTC: loadCrypto('BTC', today).then(r => ({ BTC: r })),
-      ETH: loadCrypto('ETH', today).then(r => ({ ETH: r }))
+      BTC: loadCrypto('BTC', today, gSpot).then(r => ({ BTC: r })),
+      ETH: loadCrypto('ETH', today, gSpot).then(r => ({ ETH: r })),
+      CRO: loadCrypto('CRO', today, gSpot).then(r => ({ CRO: r }))
     };
     return Promise.all(Object.entries(jobs).map(([key, p]) =>
       p.then(v => onPart(key, v, null), e => onPart(key, null, e))));

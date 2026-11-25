@@ -1,7 +1,7 @@
 /* NetguY Market – service worker: az app fájljai offline is elérhetők.
    Saját fájlok: előbb hálózat, ha nincs, a mentett példány. Az árfolyam-API-kat nem érinti. */
-const CACHE = 'ngm-shell-v1';
-const SHELL = ['./', 'index.html', 'styles.css?v=2.1.0', 'data.js?v=2.1.0', 'app.js?v=2.1.0',
+const CACHE = 'ngm-shell-v2';
+const SHELL = ['./', 'index.html', 'styles.css?v=2.2.0', 'data.js?v=2.2.0', 'app.js?v=2.2.0',
   'logo.webp', 'icon-192.png', 'icon-512.png', 'manifest.webmanifest'];
 
 self.addEventListener('install', e => {
