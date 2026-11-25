@@ -61,9 +61,9 @@
     return idx >= 0 && usd[idx].d >= min ? usd[idx].v : null;
   }
 
-  /* ---------- BNR devizák + BNR aranyár ---------- */
+  /* ---------- BNR devizák ---------- */
   async function loadFX(today) {
-    const url = `https://api.frankfurter.dev/v2/providers/bnr/rates?from=${back(today, KEEP)}&to=${today}&base=RON&quotes=EUR,HUF,USD,GBP,XAU`;
+    const url = `https://api.frankfurter.dev/v2/providers/bnr/rates?from=${back(today, KEEP)}&to=${today}&base=RON&quotes=EUR,HUF,USD,GBP`;
     const data = await getJSON(url);
     if (!Array.isArray(data)) throw new Error('váratlan BNR-válasz');
     const out = {};
@@ -75,11 +75,7 @@
       if (series.length) out[sym] = { series, cur: 'RON', source: 'BNR (Frankfurter)', live: false };
     }
     if (!Object.keys(out).length) throw new Error('nem érkezett BNR-adat');
-    // A BNR az aranyat lej/grammban jegyzi; ha a válasz unciára számolt (>3000 lej), grammra váltjuk.
-    const gold = clean(data
-      .filter(r => r.base === 'RON' && r.quote === 'XAU' && good(r.rate))
-      .map(r => { const v = 1 / r.rate; return { d: r.date, v: Number((v > 3000 ? v / OZ : v).toPrecision(7)) }; }), today);
-    return { fx: out, gold };
+    return out;
   }
 
   /* ---------- Arany (RON / gramm) ---------- */
@@ -100,20 +96,55 @@
     ]);
   }
 
+  /* BNR hivatalos aranyár (lej/gramm) a cursbnr.ro nyilvános API-jából – CORS-barát, kulcs nélküli.
+     Napi kérésenként egy nap jön, ezért az utolsó 10 napot kérjük le; a régebbi napokat elmentjük. */
+  const GOLD_KEY = 'ngm-bnr-xau';
+  function goldCache() { try { return JSON.parse(localStorage.getItem(GOLD_KEY)) || {}; } catch (e) { return {}; } }
+  function saveGoldCache(c) { try { localStorage.setItem(GOLD_KEY, JSON.stringify(c)); } catch (e) { /* nincs tároló */ } }
+
+  async function bnrGoldRecent(today) {
+    const cache = goldCache();
+    const days = [];
+    for (let i = 0; i < 10; i++) days.push(back(today, i));
+    const fresh = back(today, 1);
+    const need = days.filter(d => !cache[d] || d >= fresh); // ma és tegnap mindig friss lekérés (13 óra körül jön az új jegyzés)
+    const res = await Promise.allSettled(need.map(d => getJSON(`https://www.cursbnr.ro/api/v1/rates/${d}?currency=XAU`, 10000)));
+    res.forEach((r, i) => {
+      if (r.status !== 'fulfilled') return;
+      const j = r.value, v = Number(j && j.rates && j.rates.XAU);
+      if (good(v) && isISO(j.date)) cache[need[i]] = { d: j.date, v };
+    });
+    for (const k of Object.keys(cache)) if (k < back(today, 40)) delete cache[k];
+    saveGoldCache(cache);
+    return days.map(d => cache[d]).filter(Boolean);
+  }
+
   async function loadGold(today, usd) {
-    const [hist, spot] = await Promise.allSettled([
+    const [bnr, hist, spot] = await Promise.allSettled([
+      bnrGoldRecent(today),
       goldHistoryUSD(),
       getJSON('https://xaus.com/api/v1/spot?currency=RON&unit=gram')
     ]);
+    const bnrRows = bnr.status === 'fulfilled' ? bnr.value : [];
     const rows = [];
     const sources = [];
     if (hist.status === 'fulfilled') {
-      sources.push(hist.value.source);
       for (const r of hist.value.rows) {
         const fx = fxAt(usd, r.d);
         if (good(fx) && good(r.v)) rows.push({ d: r.d, v: r.v * fx / OZ });
       }
     }
+    if (bnrRows.length) {
+      // A BNR-jegyzés az irányadó: a régebbi napokat a spot-előzmény adja, a legutóbbi napokat a BNR.
+      const lastBnr = bnrRows.reduce((m, r) => (r.d > m ? r.d : m), '');
+      const firstBnr = bnrRows.reduce((m, r) => (r.d < m ? r.d : m), lastBnr);
+      const older = rows.filter(r => r.d < firstBnr);
+      const series = clean(older.concat(bnrRows), today);
+      const src = 'BNR hivatalos aranyár (cursbnr.ro)' + (older.length ? ` · korábbi napok: ${hist.value.source}, BNR USD/RON-nal` : '');
+      return { series, cur: 'RON', source: src, live: false };
+    }
+    // Tartalék: nemzetközi spot ár, átszámítva.
+    if (hist.status === 'fulfilled') sources.push(hist.value.source);
     let live = false;
     if (spot.status === 'fulfilled') {
       const x = spot.value && spot.value.xau;
@@ -129,7 +160,7 @@
     if (!series.length) {
       throw new Error(hist.status === 'rejected' ? hist.reason.message : 'nincs aranyár');
     }
-    return { series, cur: 'RON', source: sources.join(' + ') + ' · USD→RON (BNR)', live };
+    return { series, cur: 'RON', source: 'Spot ár (a BNR nem elérhető): ' + sources.join(' + ') + ' · USD→RON (BNR)', live };
   }
 
   /* ---------- Kripto (USD) ---------- */
@@ -223,15 +254,10 @@
     const fxP = loadFX(today);
     const gSpot = geckoSpotAll();
     const jobs = {
-      fx: fxP.then(r => r.fx),
-      XAU: fxP.catch(() => null).then(r => {
-        if (r && r.gold.length >= 2) {
-          return { XAU: { series: r.gold, cur: 'RON', source: 'BNR hivatalos aranyár (Frankfurter)', live: false } };
-        }
-        const fx = r && r.fx;
+      fx: fxP,
+      XAU: fxP.catch(() => null).then(fx => {
         const usd = fx && fx.USD ? fx.USD.series : opts.usdFallback;
-        if (!usd || !usd.length) throw new Error('USD/RON adat nélkül nem számolható');
-        return loadGold(today, usd).then(g => ({ XAU: g }));
+        return loadGold(today, usd || []).then(g => ({ XAU: g }));
       }),
       BTC: loadCrypto('BTC', today, gSpot).then(r => ({ BTC: r })),
       ETH: loadCrypto('ETH', today, gSpot).then(r => ({ ETH: r })),
