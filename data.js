@@ -61,9 +61,9 @@
     return idx >= 0 && usd[idx].d >= min ? usd[idx].v : null;
   }
 
-  /* ---------- BNR devizák ---------- */
+  /* ---------- BNR devizák + BNR aranyár ---------- */
   async function loadFX(today) {
-    const url = `https://api.frankfurter.dev/v2/providers/bnr/rates?from=${back(today, KEEP)}&to=${today}&base=RON&quotes=EUR,HUF,USD,GBP`;
+    const url = `https://api.frankfurter.dev/v2/providers/bnr/rates?from=${back(today, KEEP)}&to=${today}&base=RON&quotes=EUR,HUF,USD,GBP,XAU`;
     const data = await getJSON(url);
     if (!Array.isArray(data)) throw new Error('váratlan BNR-válasz');
     const out = {};
@@ -75,7 +75,11 @@
       if (series.length) out[sym] = { series, cur: 'RON', source: 'BNR (Frankfurter)', live: false };
     }
     if (!Object.keys(out).length) throw new Error('nem érkezett BNR-adat');
-    return out;
+    // A BNR az aranyat lej/grammban jegyzi; ha a válasz unciára számolt (>3000 lej), grammra váltjuk.
+    const gold = clean(data
+      .filter(r => r.base === 'RON' && r.quote === 'XAU' && good(r.rate))
+      .map(r => { const v = 1 / r.rate; return { d: r.date, v: Number((v > 3000 ? v / OZ : v).toPrecision(7)) }; }), today);
+    return { fx: out, gold };
   }
 
   /* ---------- Arany (RON / gramm) ---------- */
@@ -219,8 +223,12 @@
     const fxP = loadFX(today);
     const gSpot = geckoSpotAll();
     const jobs = {
-      fx: fxP,
-      XAU: fxP.catch(() => null).then(fx => {
+      fx: fxP.then(r => r.fx),
+      XAU: fxP.catch(() => null).then(r => {
+        if (r && r.gold.length >= 2) {
+          return { XAU: { series: r.gold, cur: 'RON', source: 'BNR hivatalos aranyár (Frankfurter)', live: false } };
+        }
+        const fx = r && r.fx;
         const usd = fx && fx.USD ? fx.USD.series : opts.usdFallback;
         if (!usd || !usd.length) throw new Error('USD/RON adat nélkül nem számolható');
         return loadGold(today, usd).then(g => ({ XAU: g }));

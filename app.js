@@ -6,7 +6,7 @@
   /* ---------- Eszközök ---------- */
   const GROUPS = [
     { id: 'fx', title: 'Devizák', sub: 'BNR hivatalos árfolyam · RON', syms: ['EUR', 'USD', 'GBP', 'HUF'] },
-    { id: 'XAU', title: 'Nemesfém', sub: 'Spot ár · RON', syms: ['XAU'] },
+    { id: 'XAU', title: 'Nemesfém', sub: 'BNR · lej/gramm', syms: ['XAU'] },
     { id: 'crypto', title: 'Kripto', sub: 'Piaci ár', syms: ['BTC', 'ETH', 'CRO'] }
   ];
   const META = {
@@ -21,7 +21,7 @@
   };
   const NOTES = {
     fx: 'Hivatalos BNR referencia-árfolyam. Hétvégén és ünnepnapon nincs új jegyzés.',
-    gold: 'Nemzetközi spot ár USD/unciában, a napi BNR USD/RON árfolyammal grammra és lejre átszámítva.',
+    gold: 'A BNR hivatalos aranyára lej/grammban, munkanapokon frissül. Ha nem elérhető, a nemzetközi spot árat számoljuk át a BNR USD/RON árfolyamával.',
     crypto: 'Napi záróár (UTC); a mai érték az aktuális piaci ár (CoinGecko).'
   };
   const RANGES = [[7, '7N'], [30, '1H'], [90, '3H'], [180, '6H'], [365, '1É']];
